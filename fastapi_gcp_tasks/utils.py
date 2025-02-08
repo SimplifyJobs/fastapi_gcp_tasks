@@ -1,6 +1,8 @@
-# Third Party Imports
+# Standard Library Imports
+import os
 from typing import Any
 
+# Third Party Imports
 import grpc
 from google.api_core.exceptions import AlreadyExists
 from google.cloud import scheduler_v1, tasks_v2
@@ -31,8 +33,9 @@ def ensure_queue(
     """
     # We extract information from the queue path to make the public api simpler
     parsed_queue_path = client.parse_queue_path(path=path)
+    location_args = {k: v for k, v in parsed_queue_path.items() if k in ("project", "location")}
     create_req = tasks_v2.CreateQueueRequest(
-        parent=location_path(**parsed_queue_path),
+        parent=location_path(**location_args),
         queue=tasks_v2.Queue(name=path, **kwargs),
     )
     try:
@@ -41,8 +44,27 @@ def ensure_queue(
         pass
 
 
-def emulator_client(*, host: str = "localhost:8123") -> tasks_v2.CloudTasksClient:
+def emulator_client() -> tasks_v2.CloudTasksClient:
     """Helper function to create a CloudTasksClient from an emulator host."""
-    channel = grpc.insecure_channel(host)
+    host = os.getenv("CLOUD_TASKS_EMULATOR_HOST", "localhost")
+    port = os.getenv("CLOUD_TASKS_EMULATOR_PORT", "8123")
+    target = f"{host}:{port}"
+    
+    # Configure DNS resolution for Docker networking
+    options = [
+        ('grpc.enable_http_proxy', 0),
+        ('grpc.enable_retries', 0),
+        ('grpc.max_receive_message_length', -1),
+        ('grpc.max_send_message_length', -1),
+        ('grpc.keepalive_time_ms', 30000),
+        ('grpc.dns_resolver_query_timeout_ms', 1000),
+        ('grpc.dns_resolver_backoff_multiplier', 1.0),
+        ('grpc.dns_resolver_backoff_jitter', 0.0),
+        ('grpc.dns_resolver_backoff_min_seconds', 1),
+        ('grpc.dns_resolver_backoff_max_seconds', 5),
+    ]
+    
+    # Create channel with DNS resolution options
+    channel = grpc.insecure_channel(target, options=options)
     transport = transports.CloudTasksGrpcTransport(channel=channel)
     return tasks_v2.CloudTasksClient(transport=transport)

@@ -9,7 +9,6 @@ from google.protobuf import duration_pb2
 # Imports from this repository
 from examples.full.serializer import Payload
 from examples.full.settings import (
-    CLOUD_TASKS_EMULATOR_URL,
     IS_LOCAL,
     SCHEDULED_LOCATION_PATH,
     SCHEDULED_OIDC_TOKEN,
@@ -36,7 +35,7 @@ logger = logging.getLogger("uvicorn")
 
 delayed_client = None
 if IS_LOCAL:
-    delayed_client = emulator_client(host=CLOUD_TASKS_EMULATOR_URL)
+    delayed_client = emulator_client()
 
 DelayedRoute = DelayedRouteBuilder(
     client=delayed_client,
